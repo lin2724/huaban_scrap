@@ -1,0 +1,6 @@
+2016.6.13
+1.change '\n' detect method
+2.change maxid ps:it's not a good idea to set a start maxid manually
+3.fix bug,witch will cause one pic miss-download when start task
+4.add dumplicate file detection,no longer re-download img which already exist in download folder
+5.add dumplicate url delete method
