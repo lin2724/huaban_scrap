@@ -255,6 +255,11 @@ def rename_Img_file_by_type(filepath):
         os.rename(filepath, filepath + '.' + tail)
 def check_img_exist(filelinks = [], storepath = ''):
     dellist = []
+    filelinks = list()
+    if not os.path.exist(storepath):
+        print 'store dir not exist, create it.'
+        os.mkdir(storepath)
+        return filelinks
     for file in os.listdir(storepath):
         for link in filelinks:
             if link.split('/')[-1] == file.split('.')[0]:
