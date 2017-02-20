@@ -80,6 +80,7 @@ def do_login(cookie_file):
     #    fd.write(data)
     return 1
 
+
 def get_config(section, name):
     config = ConfigParser.ConfigParser()
     config.readfp(open(config_file, 'r'))
@@ -146,6 +147,8 @@ def get_huaban_by_board(board):
                     linkfd.write(pin)
                     linkfd.write('\n')
             print ('count %d' % count)
+            
+            
 def get_pic_by_url( links = [], *args ):
     """
     get pic and store it and rename it by its img type
@@ -174,6 +177,8 @@ def get_pic_by_url( links = [], *args ):
                     break
                 print ('parse img fail %s' % link)
                 print ('try again')
+                
+                
 def get_pic_by_lines( start, end,file, *args ):
     """
     get pic and store it and rename it by its img type
@@ -204,12 +209,14 @@ def get_pic_by_lines( start, end,file, *args ):
                         break
                     except:
                         trytic += 1
-                        if (trytic % 3) == 0:
+                        if trytic > 3:
+                            trytic = 0
+                            print ('parse img fail %s' % link)
                             break
-                        print ('parse img fail %s' % link)
-                        print ('try again')
+                        #print ('try again')
                         continue
 
+                        
 def get_huaban_pic_by_file(file):
     threadmax = get_config('scrapy_settings', 'thread_number')
     threadmax = int(threadmax)
@@ -246,13 +253,22 @@ def get_huaban_pic_by_file(file):
     tail = len(links) % threadmax
     if tail:
         get_pic_by_lines(len(links)-tail,len(links)-1,file)
-def rename_Img_file_by_type(filepath):
+        
+        
+def rename_Img_file_by_type(filepath
+                           print 'we assume is to be jpeg'):
     tail = imghdr.what(filepath)
     if tail:
         if filepath[-(len(tail)+1):] == ('.'+tail):
             print ('already in right tail')
             return
         os.rename(filepath, filepath + '.' + tail)
+    else:
+        print 'Warning:img type not recorgnize!%s' % filepath
+        print 'we assume is to be jpg'
+        os.rename(filepath, filepath + '.' + 'jpg')
+        
+        
 def check_img_exist(filelinks = [], storepath = ''):
     dellist = []
     filelinks = list()
@@ -270,12 +286,16 @@ def check_img_exist(filelinks = [], storepath = ''):
         except:
             pass
     return filelinks
+
+
 def remove_dumplicate_list(seq = []):
     seen = set()
     seen_add = seen.add
     tmp = [x for x in seq if not (x in seen or seen_add(x))]
     print ('after remove %d' % len(tmp))
     return tmp
+
+
 if __name__ == '__main__':
     do_login('huaban.cookie')
     if len(sys.argv) > 1:
