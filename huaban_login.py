@@ -14,6 +14,8 @@ import sys
 import platform
 import multiprocessing
 import ConfigParser
+import socket
+import time
 
 store_json_file = 'huaban.json'
 config_file = 'huaban_config.ini'
@@ -169,7 +171,7 @@ def get_pic_by_url( links = [], *args ):
                 content = urllib2.urlopen(req_imgurl, timeout=20).read()
                 with open(os.path.join(img_store_path, link[len('http://hbimg.b0.upaiyun.com/'):]), 'wb+') as ifd:
                     ifd.write(content)
-                rename_Img_file_by_type(os.path.join(img_store_path, link[len('http://hbimg.b0.upaiyun.com/'):]))
+                rename_img_file_by_type(os.path.join(img_store_path, link[len('http://hbimg.b0.upaiyun.com/'):]))
                 break
             except:
                 trytic += 1
@@ -185,7 +187,7 @@ def get_pic_by_lines( start, end,file, *args ):
     arg;links should be a list
     """
     #print ('%s %s %s'%(start, end, file))
-    print ('thread pid %d'%os.getpid())
+    print ('thread pid %d' % os.getpid())
     http_headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux i686; rv:8.0) Gecko/20100101 Firefox/8.0'}
     if not os.path.exists(img_store_path):
         os.mkdir(img_store_path)
@@ -202,19 +204,20 @@ def get_pic_by_lines( start, end,file, *args ):
                 while True:
                     try:
                         content = urllib2.urlopen(req_imgurl, timeout=20).read()
-                        #print 'data download ok'
                         with open(os.path.join(img_store_path, link[len('http://hbimg.b0.upaiyun.com/'):]), 'wb+') as ifd:
                             ifd.write(content)
-                        rename_Img_file_by_type(os.path.join(img_store_path, link[len('http://hbimg.b0.upaiyun.com/'):]))
+                        rename_img_file_by_type(os.path.join(img_store_path, link[len('http://hbimg.b0.upaiyun.com/'):]))
                         break
-                    except:
+                    except urllib2.HTTPError:
+                        e = sys.exc_info()[0]
+                        print 'parse fail.. %s for %s' % (e, link)
                         trytic += 1
                         if trytic > 3:
-                            trytic = 0
                             print ('parse img fail %s' % link)
                             break
-                        #print ('try again')
-                        continue
+                    except KeyboardInterrupt:
+                        print 'keyboard except, thread %d quit' % os.getpid()
+                        return
 
                         
 def get_huaban_pic_by_file(file):
@@ -233,7 +236,7 @@ def get_huaban_pic_by_file(file):
         if not link:
             break
         links_before.append(link.split('\n')[0])
-    links = remove_dumplicate_list(links_before)
+    links = remove_duplicate_list(links_before)
     del links_before[:]
     print ('total pic %d' % len(links))
     check_img_exist(links, img_store_path)
@@ -253,26 +256,33 @@ def get_huaban_pic_by_file(file):
     tail = len(links) % threadmax
     if tail:
         get_pic_by_lines(len(links)-tail,len(links)-1,file)
+    while True:
+        try:
+            time.sleep(3)
+        except KeyboardInterrupt:
+            print 'key board exception, quit'
+            time.sleep(3)
         
         
-def rename_Img_file_by_type(filepath
-                           print 'we assume is to be jpeg'):
+def rename_img_file_by_type(filepath):
     tail = imghdr.what(filepath)
-    if tail:
+    if tail or not len(tail):
         if filepath[-(len(tail)+1):] == ('.'+tail):
             print ('already in right tail')
             return
-        os.rename(filepath, filepath + '.' + tail)
+        new_file_path = filepath + '.' + tail
     else:
         print 'Warning:img type not recorgnize!%s' % filepath
         print 'we assume is to be jpg'
-        os.rename(filepath, filepath + '.' + 'jpg')
+        new_file_path = filepath + '.' + 'jpg'
+    if not os.path.exists(new_file_path):
+        os.rename(filepath, new_file_path)
         
         
 def check_img_exist(filelinks = [], storepath = ''):
     dellist = []
     filelinks = list()
-    if not os.path.exist(storepath):
+    if not os.path.exists(storepath):
         print 'store dir not exist, create it.'
         os.mkdir(storepath)
         return filelinks
@@ -288,7 +298,7 @@ def check_img_exist(filelinks = [], storepath = ''):
     return filelinks
 
 
-def remove_dumplicate_list(seq = []):
+def remove_duplicate_list(seq = []):
     seen = set()
     seen_add = seen.add
     tmp = [x for x in seq if not (x in seen or seen_add(x))]
