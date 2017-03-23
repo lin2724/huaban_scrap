@@ -185,7 +185,7 @@ def get_pic_by_url(link, *args ):
                 log_huaban('try again')
                 
                 
-def get_pic_by_lines( start, end, file, *args):
+def get_pic_by_lines(start, end, file, *args):
     """
     get pic and store it and rename it by its img type
     arg;links should be a list
@@ -198,11 +198,11 @@ def get_pic_by_lines( start, end, file, *args):
         os.mkdir(img_store_path)
     # in case undefined arg
     tmp_file_path = 'xx'
-    with open(file,'r') as fd:
+    with open(file, 'r') as fd:
         for idx, line in enumerate(fd):
             if start <= idx <= end:
-                link = line[:-1]
-                log_huaban(link + time.asctime())
+                link = line[:-1]  # skip \n
+                log_huaban(link + time.asctime(), 4)
                 req_img_url = urllib2.Request(
                     url=link,
                     headers=http_headers
@@ -217,7 +217,7 @@ def get_pic_by_lines( start, end, file, *args):
                         tmp_file_path = os.path.join(img_store_path, link[len('http://hbimg.b0.upaiyun.com/'):])
                         with open(tmp_file_path, 'wb+') as ifd:
                             ifd.write(content)
-                        rename_img_file_by_type(tmp_file_path)
+                        rename_img_file_by_type(tmp_file_path, idx)
                         gTotalImgProCnt += 1
                         break
                     except urllib2.HTTPError:
@@ -230,19 +230,22 @@ def get_pic_by_lines( start, end, file, *args):
                     except KeyboardInterrupt:
                         log_huaban('keyboard except, thread %d quit' % os.getpid(), 1)
                         return
+                    except socket.timeout as e:
+                        log_huaban('parse timeout', 4)
                     except:
                         e = sys.exc_info()[0]
                         # record emergency unknow error
                         log_huaban(('ERROR:%s' % str(e)), 0)
-                        # remove tmp_file
+                        # remove tmp_file if exist
                         if os.path.exists(tmp_file_path) and os.path.isfile(tmp_file_path):
                             os.remove(tmp_file_path)
+                            log_huaban('remove tmp file [%s]' % tmp_file_path)
                         # don't harsh, rest a while
                         time.sleep(3)
                         pass
 
 gThreadMutexLog = threading.Lock()
-gLogLevel = 2
+gLogLevel = 3
 gTotalImgProCnt = 0
 gStopFlag = False
 
@@ -285,9 +288,9 @@ def get_huaban_pic_by_file(file):
     if len(links) >= set_max_thread:
         filper = len(links) // set_max_thread
         idx = 0
-        while idx < len(links):
+        while (idx+filper-1) < len(links):
             try:
-                pro = threading.Thread(target=get_pic_by_lines, args=(idx, idx+filper-1,file))
+                pro = threading.Thread(target=get_pic_by_lines, args=(idx, idx+filper-1, file))
                 pro.setDaemon(False)
                 pro.start()
                 child_process_list.append(pro)
@@ -296,13 +299,15 @@ def get_huaban_pic_by_file(file):
             except:
                 log_huaban('something err when start thread', 0)
                 continue
-    tail = len(links) % set_max_thread
+    tail = len(links) % filper
     if tail:
         pro = threading.Thread(target=get_pic_by_lines, args=(len(links)-tail, len(links)-1, file))
         pro.setDaemon(False)
         pro.start()
+        child_process_list.append (pro)
         # get_pic_by_lines(len(links)-tail,len(links)-1,file)
     tmp_link_file = get_config('login_account_info', 'link_file')
+    tmp_link_file = os.path.join(os.getcwd(), tmp_link_file)
     while True:
         try:
             all_exist = True
@@ -311,8 +316,9 @@ def get_huaban_pic_by_file(file):
                     all_exist = False
                     break
             if all_exist:
-                log_huaban('All Task Done, quit..' ,0)
-                os.remove(tmp_link_file)
+                log_huaban('All Task Done, quit.. total [%d]' % gTotalImgProCnt, 0)
+                time.sleep(5)
+                # os.remove(tmp_link_file)
                 return
             time.sleep(2)
             rec_cnt_start = gTotalImgProCnt
@@ -325,7 +331,7 @@ def get_huaban_pic_by_file(file):
             exit(0)
 
 
-def rename_img_file_by_type(filepath):
+def rename_img_file_by_type(filepath, line_idx):
     tail = imghdr.what(filepath)
     if tail:
         if filepath[-(len(tail)+1):] == ('.'+tail):
@@ -338,25 +344,28 @@ def rename_img_file_by_type(filepath):
         new_file_path = filepath + '.' + 'jpg'
     if not os.path.exists(new_file_path):
         os.rename(filepath, new_file_path)
+    else:
+        log_huaban('dup file! at [%d]' % line_idx)
+        os.remove(filepath)
         
         
 def check_img_exist(file_links, storepath):
-    dellist = []
-    filelinks = list()
+    dell_list = []
+    files_path = list()
     if not os.path.exists(storepath):
         log_huaban('store dir not exist, create it.')
         os.mkdir(storepath)
-        return filelinks
+        return files_path
     for file in os.listdir(storepath):
-        for link in filelinks:
+        for link in files_path:
             if link.split('/')[-1] == file.split('.')[0]:
-                dellist.append(link)
-    for link in dellist:
+                dell_list.append(link)
+    for link in dell_list:
         try:
-            filelinks.remove(link)
+            files_path.remove(link)
         except:
             pass
-    return filelinks
+    return files_path
 
 
 def remove_duplicate_list(seq):
@@ -371,7 +380,7 @@ def main():
     do_login('huaban.cookie')
     if len(sys.argv) > 1:
         for idx in sys.argv[1:]:
-            log_huaban(('get board %d'% int(idx)))
+            log_huaban(('get board %d' % int(idx)))
             get_huaban_by_board(idx)
             log_huaban('get links done, rerun program again without args to download those imgs')
     else:
