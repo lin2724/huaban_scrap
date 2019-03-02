@@ -285,6 +285,7 @@ def get_huaban_pic_by_file(file):
     log_huaban(('total pic after remove duplicate img %d' % len(links)))
     child_process_list = list()
     gStopFlag = False
+
     if len(links) >= set_max_thread:
         filper = len(links) // set_max_thread
         idx = 0
@@ -299,6 +300,8 @@ def get_huaban_pic_by_file(file):
             except:
                 log_huaban('something err when start thread', 0)
                 continue
+    else:
+        filper = len(links) + 1
     tail = len(links) % filper
     if tail:
         pro = threading.Thread(target=get_pic_by_lines, args=(len(links)-tail, len(links)-1, file))
